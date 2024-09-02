@@ -13,7 +13,6 @@ present_dir = os.getcwd()
 
 
 def parse_json(filename):
-    print(filename)
     with open(filename) as access_json:
         read_content = json.load(access_json)
     results = read_content['result']
