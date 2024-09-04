@@ -1,84 +1,111 @@
-import pandas as pd
-from solcx import compile_source, install_solc, set_solc_version
 import re
+import pandas as pd
+from solcx import compile_source, install_solc, set_solc_version, get_installed_solc_versions
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
-
 os.chdir('/Users/warren/PycharmProjects/smart-contract-vulnerabilities-detection/')
 
-
-def extract_version_from_pragma(source_code):
-    """Extract the required Solidity compiler version from the pragma directive."""
-    match = re.search(r'pragma solidity \^([\d.]+);', source_code)
+def get_solc_version_from_source(source_code):
+    """
+    Extract the required Solidity compiler version from the source code pragma directive.
+    """
+    match = re.search(r'pragma solidity \^?([0-9]+\.[0-9]+\.[0-9]+);', source_code)
+    print(match)
     if match:
-        version = match.group(1)
-        return version
-    return None
+        return match.group(1)
+    else:
+        raise ValueError("Solidity version pragma not found in source code.")
 
 
-def compile_contract_to_bytecode(source_code, version):
-    """Compile Solidity source code to bytecode using a specific compiler version."""
-    compiler_version = f'0.4.{version.split(".")[1]}'  # Adjust as needed
-    if float(version.split(".")[0] + "." + version.split(".")[1]) < 0.4:
-        raise ValueError(f"Compiler version {compiler_version} is not supported by py-solc-x.")
-
-    if float(version.split(".")[0] + "." + version.split(".")[1]) < 0.11:
-        raise ValueError(f"Solidity version ^{version} is not supported by py-solc-x.")
-
+def compile_contract_to_bytecode(source_code):
+    """
+    Compiles Solidity source code to bytecode using the appropriate Solidity compiler version.
+    """
     try:
-        install_solc(compiler_version)
+        # Extract the required compiler version from the source code
+        solc_version = get_solc_version_from_source(source_code)
+
+        # Check if the required version is already installed, if not, install it
+        if solc_version not in get_installed_solc_versions():
+            print(f"Installing Solidity compiler version {solc_version}...")
+            install_solc(solc_version)
+
+        # Set the correct compiler version
+        set_solc_version(solc_version)
+
+        # Compile the Solidity source code to bytecode
+        compiled_sol = compile_source(source_code)
+        contract_interface = compiled_sol[next(iter(compiled_sol))]
+        bytecode = contract_interface['bin']
+        return bytecode
+
     except Exception as e:
-        print(f"Error installing compiler version {compiler_version}: {e}")
-        raise
-
-    set_solc_version(compiler_version)
-
-    compiled_sol = compile_source(source_code)
-    contract_interface = compiled_sol[next(iter(compiled_sol))]
-    bytecode = contract_interface['bin']
-    return bytecode
+        print(f"Error compiling contract: {e}")
+        return None
 
 
 def bytecode_to_opcodes(bytecode):
-    """Convert bytecode to operation codes (opcodes)."""
-    opcodes = [bytecode[i:i + 2] for i in range(0, len(bytecode), 2)]
-    return opcodes
+    """
+    Converts bytecode to operation codes (opcodes).
+    """
+    if bytecode:
+        # Split bytecode into chunks of 2 characters (1 byte)
+        opcodes = [bytecode[i:i + 2] for i in range(0, len(bytecode), 2)]
+        return opcodes
+    else:
+        return []
 
 
 def extract_opcodes_from_source(source_code):
-    """Compile source code to bytecode and extract opcodes based on the required compiler version."""
-    version = extract_version_from_pragma(source_code)
-    if not version:
-        raise ValueError("Unable to determine Solidity compiler version from source code.")
+    """
+    Extracts opcodes from Solidity source code by compiling it to bytecode.
+    """
+    # Compile source code to bytecode
+    bytecode = compile_contract_to_bytecode(source_code)
 
-    major_minor_version = float(version.split(".")[0] + "." + version.split(".")[1])
-    if major_minor_version < 0.4:
-        raise ValueError(f"Solidity version ^{version} is not supported.")
-
-    bytecode = compile_contract_to_bytecode(source_code, version)
+    # Extract opcodes from bytecode
     opcodes = bytecode_to_opcodes(bytecode)
+
     return opcodes
 
 
+def process_contract(row):
+    """
+    Processes a single contract to compile and extract opcodes.
+    """
+    source_code = row['code']
+    try:
+        opcodes = extract_opcodes_from_source(source_code)
+        return opcodes
+    except Exception as e:
+        print(f"Error processing contract at address {row['Address']}: {e}")
+        return None
+
+
 if __name__ == '__main__':
+    # Load the CSV file containing smart contracts
     df = pd.read_csv('Data Preprocessing/processed_contracts.csv')
 
+    # Ensure the DataFrame has the correct columns
+    if 'code' not in df.columns:
+        raise ValueError("The DataFrame must have a 'Source Code' column containing Solidity code.")
 
-    def filter_supported_versions(code):
-        """Filter out unsupported versions."""
-        try:
-            version = extract_version_from_pragma(code)
-            if version:
-                major_minor_version = float(version.split(".")[0] + "." + version.split(".")[1])
-                return major_minor_version >= 0.4
-        except ValueError:
-            pass
-        return False
+    # Use ThreadPoolExecutor to parallelize processing of contracts
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        # Map process_contract function to each row in the DataFrame
+        futures = {executor.submit(process_contract, row): row for _, row in df.iterrows()}
 
+        # Collect results as they complete
+        results = []
+        for future in as_completed(futures):
+            result = future.result()
+            results.append(result)
 
-    supported_df = df[df['code'].apply(filter_supported_versions)]
+    # Add operation codes to the DataFrame
+    df['Operation Codes'] = results
 
-    # Apply the opcode extraction
-    supported_df['Operation Codes'] = supported_df['code'].apply(extract_opcodes_from_source)
+    # Display the DataFrame with operation codes
+    print(df[['address', 'Operation Codes']])
 
-    supported_df.to_csv('Data Preprocessing/operation_contracts.csv', index=False)
-    print("Processed data saved to operation_contracts.csv")
+    # Save the updated DataFrame to a new CSV file
+    df.to_csv('Data Preprocessing/processed_contracts_with_opcodes.csv', index=False)
