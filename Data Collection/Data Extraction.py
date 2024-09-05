@@ -5,33 +5,41 @@ import json
 import pandas as pd
 import os
 
-csv_address_file = 'data/contracts.csv'
-report_dir = 'home'
+csv_address_file = 'Data Collection/contracts.csv'
+os.chdir('/Users/warrenwong/Documents/GitHub/smart-contract-vulnerabilities-detection')
 keys = 'I49P5NV5JKT9QP9HNKZUSWTQQCQGW5HVVX'
 # Get API Keys from https://etherscan.io
 present_dir = os.getcwd()
 
 
-def parse_json(filename):
+def parsesc_json(filename):
     with open(filename) as access_json:
         read_content = json.load(access_json)
     results = read_content['result']
-    file_to_create = "source_code/" + filename.replace('.json', '.sol')
-    file_to_create = file_to_create.replace('/home', '')
+    file_to_create = "Data Collection/Source_code/sol/" + filename.replace('.json', '.sol')
     for result in results:
+        print(result)
         with open(file_to_create, 'w') as file:
             file.write(result['SourceCode'])
 
-
+def parseop_json(filename):
+    with open(filename) as access_json:
+        read_content = json.load(access_json)
+    results = read_content['result']
+    file_to_create = "Data Collection/Operation_code/sol/" + filename.replace('.json', '.sol')
+    for result in results:
+        print(result)
+        with open(file_to_create, 'w') as file:
+            file.write(result)
 def etherDownloadApi(file_path, action, module, add, key):
     url = 'https://api.etherscan.io/api?module=' + module + '&action=' + action + '&address=' + add + '&apikey=' + key
     response = requests.get(url)
+    print(response)
     if response.status_code == 200:
         data = response.json()
         with open(file_path, 'w') as f:
             json.dump(data, f)
             print(add+" json completed!")
-
 
 class CheckCount:
     def __init__(self):
@@ -56,9 +64,13 @@ def extractFromEthereum():
     ProcessingResults = []
     countObj = CheckCount()
     for i in range(len(hashes)):
-        contPath = join(report_dir, hashes[i] + "_ext.json")
+        contPath = join("Data Collection/Source_code/json/", hashes[i] + ".json")
         ProcessingResults = pool.apply_async(etherDownloadApi, args=(
         contPath, 'getsourcecode', 'contract', hashes[i], keys),
+                                             callback=countObj.completedCallback)
+        contPathOp = join("Data Collection/Operation_code/json/", hashes[i] + ".json")
+        ProcessingResultsOp = pool.apply_async(etherDownloadApi, args=(
+            contPathOp, 'getopcode', 'opcode', hashes[i], keys),
                                              callback=countObj.completedCallback)
         countObj.incCount()
 
@@ -74,7 +86,9 @@ if __name__ == '__main__':
 
     try:
         for i in range(len(hashes)):
-            parse_json("home/"+hashes[i] + "_ext.json")
-            print(hashes[i]+" source code completed")
+            parsesc_json("/Data Collection/Source_code/json"+hashes[i] + ".json")
+            print(hashes[i] + " source code completed")
+            parseop_json("/Data Collection/Operation_code/json" + hashes[i] + ".json")
+            print(hashes[i] + " json code completed")
     except:
         print(hashes[i]+" cannot")
