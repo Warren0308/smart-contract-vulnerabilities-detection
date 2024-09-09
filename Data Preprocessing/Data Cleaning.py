@@ -28,7 +28,7 @@ if __name__ == '__main__':
     processed_data = []
     try:
         for i in range(len(hashes)):
-            processed_code = CommentRemover("Data Collection/Source Code/"+hashes[i] + "_ext.sol")
+            processed_code = CommentRemover("Data Collection/original/"+hashes[i] + "_ext.sol")
             processed_data.append({"address": hashes[i], "code": processed_code})
     except:
         print(hashes[i]+" cannot")

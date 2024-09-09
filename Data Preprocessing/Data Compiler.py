@@ -88,7 +88,7 @@ if __name__ == '__main__':
 
     # Ensure the DataFrame has the correct columns
     if 'code' not in df.columns:
-        raise ValueError("The DataFrame must have a 'Source Code' column containing Solidity code.")
+        raise ValueError("The DataFrame must have a 'original' column containing Solidity code.")
 
     # Use ThreadPoolExecutor to parallelize processing of contracts
     with ThreadPoolExecutor(max_workers=4) as executor:
