@@ -1,29 +1,29 @@
 # -*- coding: utf-8 -*-
-# Importing required Library
 import numpy as np
 import pandas as pd
 import random
 from sklearn.datasets import make_classification
 from sklearn.neighbors import NearestNeighbors
-import os
-
 from sklearn.utils import resample
+import os
 
 # Set your working directory
 os.chdir('/Users/warren/PycharmProjects/smart-contract-vulnerabilities-detection/')
+
 # Load the new CSV file
 df = pd.read_csv('3_Data Encoding/OP_train.csv')
+
+
 def create_dataset(n_sample=1000):
     '''
-    Create a unevenly distributed sample data set multilabel
-    classification using make_classification function
+    Create an unevenly distributed sample dataset for multilabel classification.
 
-    args
-    nsample: int, Number of sample to be created
+    args:
+    nsample: int, Number of samples to be created.
 
-    return
-    X: pandas.DataFrame, feature vector dataframe with 10 features
-    y: pandas.DataFrame, target vector dataframe with 5 labels
+    return:
+    X: pandas.DataFrame, feature vector dataframe with 10 features.
+    y: pandas.DataFrame, target vector dataframe with 5 labels.
     '''
     X, y = make_classification(n_classes=5, class_sep=2,
                                weights=[0.1, 0.025, 0.205, 0.008, 0.9], n_informative=3, n_redundant=1, flip_y=0,
@@ -34,13 +34,13 @@ def create_dataset(n_sample=1000):
 
 def get_tail_label(df):
     """
-    Give tail label colums of the given target dataframe
+    Get tail label columns of the given target dataframe.
 
-    args
-    df: pandas.DataFrame, target label df whose tail label has to identified
+    args:
+    df: pandas.DataFrame, target label df whose tail label has to be identified.
 
-    return
-    tail_label: list, a list containing column name of all the tail label
+    return:
+    tail_label: list, a list containing column names of all the tail labels.
     """
     columns = df.columns
     n = len(columns)
@@ -58,12 +58,13 @@ def get_tail_label(df):
 
 def get_index(df):
     """
-    give the index of all tail_label rows
-    args
-    df: pandas.DataFrame, target label df from which index for tail label has to identified
+    Get the index of all tail label rows.
 
-    return
-    index: list, a list containing index number of all the tail label
+    args:
+    df: pandas.DataFrame, target label df from which indices for tail labels are identified.
+
+    return:
+    index: list, a list containing index numbers of all the tail label rows.
     """
     tail_labels = get_tail_label(df)
     index = set()
@@ -73,17 +74,17 @@ def get_index(df):
     return list(index)
 
 
-def get_minority_instace(X, y):
+def get_minority_instance(X, y):
     """
-    Give minority dataframe containing all the tail labels
+    Get minority dataframe containing all the tail labels.
 
-    args
-    X: pandas.DataFrame, the feature vector dataframe
-    y: pandas.DataFrame, the target vector dataframe
+    args:
+    X: pandas.DataFrame, the feature vector dataframe.
+    y: pandas.DataFrame, the target vector dataframe.
 
-    return
-    X_sub: pandas.DataFrame, the feature vector minority dataframe
-    y_sub: pandas.DataFrame, the target vector minority dataframe
+    return:
+    X_sub: pandas.DataFrame, the feature vector minority dataframe.
+    y_sub: pandas.DataFrame, the target vector minority dataframe.
     """
     index = get_index(y)
     X_sub = X[X.index.isin(index)].reset_index(drop=True)
@@ -91,64 +92,36 @@ def get_minority_instace(X, y):
     return X_sub, y_sub
 
 
-def nearest_neighbour(X):
+def nearest_neighbour(X, n_neighbors=5, algorithm='auto'):
     """
-    Give index of 5 nearest neighbor of all the instance
+    Get index of 5 nearest neighbors for each instance using the specified algorithm.
 
-    args
-    X: np.array, array whose nearest neighbor has to find
+    args:
+    X: np.array, the feature vector for which to find nearest neighbors.
+    n_neighbors: int, the number of nearest neighbors to find.
+    algorithm: str, the algorithm to use ('kd_tree', 'ball_tree', 'brute', 'auto').
 
-    return
-    indices: list of list, index of 5 NN of each element in X
+    return:
+    indices: list of lists, index of 5 NN for each element in X.
     """
     print(X.shape)
-    nbs = NearestNeighbors(n_neighbors=5, metric='euclidean', algorithm='kd_tree').fit(X)
+    nbs = NearestNeighbors(n_neighbors=n_neighbors, metric='euclidean', algorithm=algorithm).fit(X)
     euclidean, indices = nbs.kneighbors(X)
     return indices
 
-def undersampling(df):
-    # 选择标签列
-    labels = ['ARTHM', 'LE', 'None', 'RENT', 'TimeO']
-
-    # 计算每个标签的样本数
-    label_counts = df[labels].sum().sort_values()
-
-    print(label_counts)
-    # 创建一个空的 DataFrame 来存储下采样后的数据
-    df_balanced = pd.DataFrame()
-
-    # 从少数类开始提取样本
-    for label in label_counts.index:
-        # 存储总提取样本数
-        max_samples_per_class = 1500
-        # 获取当前类别的样本
-        df_label = df[df[label] == 1]
-        if not df_balanced.empty:
-            df_check = len(df_balanced[df_balanced[label] == 1])
-        else:
-            df_check = 0
-        # 如果当前类别的样本数大于剩余可提取数，进行下采样
-        if len(df_label) > max_samples_per_class and df_check<=1500:
-            df_label = resample(df_label, replace=False, n_samples=max_samples_per_class-df_check, random_state=42)
-
-        # 从原始数据中删除这些行
-        df = df[~df.index.isin(df_label.index)]
-        # 将当前类别的样本添加到结果 DataFrame
-        df_balanced = pd.concat([df_balanced, df_label])
-    return df_balanced
 
 def MLSMOTE(X, y, n_sample):
     """
-    Give the augmented data using MLSMOTE algorithm
+    Perform MLSMOTE (Multi-Label Synthetic Minority Over-sampling Technique).
 
-    args
-    X: pandas.DataFrame, input vector DataFrame
-    y: pandas.DataFrame, feature vector dataframe
-    n_sample: int, number of newly generated sample
+    args:
+    X: pandas.DataFrame, input vector DataFrame.
+    y: pandas.DataFrame, feature vector dataframe.
+    n_sample: int, number of newly generated samples.
 
-    return
-    new_X: pandas.DataFrame, augmented feature vector data
-    target: pandas.DataFrame, augmented target vector data
+    return:
+    new_X: pandas.DataFrame, augmented feature vector data.
+    target: pandas.DataFrame, augmented target vector data.
     """
     indices2 = nearest_neighbour(X)
     n = len(indices2)
@@ -171,27 +144,77 @@ def MLSMOTE(X, y, n_sample):
     return new_X, target
 
 
+def undersampling(df, max_samples_per_class=1500):
+    """
+    Perform undersampling on the dataset, focusing on the least represented class.
+
+    args:
+    df: pandas.DataFrame, the dataset containing features and labels.
+    max_samples_per_class: int, the maximum number of samples to retain for each class.
+
+    return:
+    df_balanced: pandas.DataFrame, the balanced dataset after undersampling.
+    """
+    labels = ['ARTHM', 'LE', 'None', 'RENT', 'TimeO']
+
+    # Count samples for each label and sort by the number of instances
+    label_counts = df[labels].sum().sort_values()
+
+    # Create an empty DataFrame for the balanced data
+    df_balanced = pd.DataFrame()
+
+    # Perform undersampling from the least represented label to the most
+    for label in label_counts.index:
+        df_label = df[df[label] == 1]
+
+        # Check how many samples of this label are already in df_balanced
+        df_check = len(df_balanced[df_balanced[label] == 1]) if not df_balanced.empty else 0
+
+        # If the number of samples for this label exceeds the max_samples_per_class, resample it
+        if len(df_label) + df_check > max_samples_per_class:
+            remaining_samples = max_samples_per_class - df_check
+            if remaining_samples > 0:
+                df_label = resample(df_label, replace=False, n_samples=remaining_samples, random_state=42)
+
+        # Remove these rows from the original dataset
+        df = df[~df.index.isin(df_label.index)]
+
+        # Add the undersampled rows to the balanced DataFrame
+        df_balanced = pd.concat([df_balanced, df_label])
+
+    return df_balanced
+
+
 if __name__ == '__main__':
     """
-    main function to use the MLSMOTE
+    Main function to apply MLSMOTE and perform resampling.
     """
-    # Select columns from 'embedding_1' to 'embedding_768' for X
-    X, y = df.loc[:,
-        [f'embedding_{i + 1}' for i in range(200)]],df[['ARTHM','LE','None','RENT','TimeO']] # Creating a Dataframe
-    X_sub, y_sub = get_minority_instace(X, y)  # Getting minority instance of that datframe
-    X_res, y_res = MLSMOTE(X_sub, y_sub, 1000)  # Applying MLSMOTE to augment the dataframe
+    # Select columns for X (features) and y (labels)
+    X = df.loc[:, [f'embedding_{i + 1}' for i in range(300)]]
+    y = df[['ARTHM', 'LE', 'None', 'RENT', 'TimeO']]
+    check = df.drop_duplicates()
+    # Step 1: Get minority instances
+    X_sub, y_sub = get_minority_instance(X, y)
+
+    # Step 2: Apply MLSMOTE to augment the dataset
+    X_res, y_res = MLSMOTE(X_sub, y_sub, 1000)
+
+    # Step 3: Filter out 'ARTHM' and 'None' classes if they already have enough samples
+    indices_to_keep = y_res[~((y_res['ARTHM'] == 1) | (y_res['None'] == 1))].index
+    y_res = y_res.loc[indices_to_keep]
+    X_res = X_res.loc[indices_to_keep]
+
+    # Step 4: Combine original and resampled data
     print(df[['ARTHM', 'LE', 'None', 'RENT', 'TimeO']].sum())
-    y_res = y_res[~((y_res['ARTHM'] == 1) | (y_res['None'] == 1))]
-    # 将新生成的数据与原始数据拼接
-    new_X = pd.concat([X, X_res], ignore_index=True)
-    new_y = pd.concat([y, y_res], ignore_index=True)
-    # 将拼接后的数据重新组合成一个 DataFrame
-    result_df = pd.concat([new_X, new_y], axis=1)
+    new_df = pd.concat([X_res, y_res], axis=1)
+    print(new_df[['ARTHM', 'LE', 'None', 'RENT', 'TimeO']].sum())
+    result_df = pd.concat([df, new_df], ignore_index=True)
     print(result_df[['ARTHM', 'LE', 'None', 'RENT', 'TimeO']].sum())
+    # Step 5: Drop duplicates
     result_df = result_df.drop_duplicates()
     print(result_df[['ARTHM', 'LE', 'None', 'RENT', 'TimeO']].sum())
+    # Step 6: Apply undersampling
     new_df = undersampling(result_df)
     print(new_df[['ARTHM', 'LE', 'None', 'RENT', 'TimeO']].sum())
+    # Step 7: Save the final balanced dataset to CSV
     new_df.to_csv('3_Data Encoding/OP_train_final.csv')
-
-

@@ -12,7 +12,7 @@ source_code_train = pd.read_csv('3_Data Encoding/SC_train.csv')
 source_code_test = pd.read_csv('3_Data Encoding/SC_test.csv')
 
 # Load the operation code dataset
-operation_code_df = pd.read_csv('3_Data Encoding/Operation_Code_Embedding.csv')
+operation_code_df = pd.read_csv('3_Data Encoding/Operation_Code_Embedding_300.csv')
 # Convert 'vulnerability_types' from string to list
 operation_code_df['vulnerability_type'] = operation_code_df['vulnerability_type'].apply(eval)
 
